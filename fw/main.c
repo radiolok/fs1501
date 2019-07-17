@@ -1,6 +1,10 @@
 #include <msp430.h> 
 #include "HAL/HAL_PMM.h"
 
+
+
+#include "driver/uart.h"
+
 void ClockInit(){
 
     /*MCLK and SMCLK = DCO frequency about 2MHz*/
@@ -44,6 +48,23 @@ void ClockInit(){
 }
 
 
+void uartCallback(uint8_t cmd){
+    UartSendByte(cmd);
+}
+
+void toggle(void)
+{
+      if (P4IN & BIT7)
+    {
+        P4OUT &= ~(BIT7 + BIT3);
+    }
+    else
+    {
+        P4OUT |= BIT7 + BIT3;
+    }
+
+}
+
 /*
  * main.c
  */
@@ -64,31 +85,38 @@ int main(void) {
 
 	UCSCTL4 |= SELA0 + SELA1 + SELS0 + SELS2 + SELM0 + SELM2;// ACLK = XT2CLK
 	//UCSCTL5 |= DIVPA2 + DIVPA0;
-	UCSCTL6 |= XT2DRIVE1 + XT2DRIVE0;
+	//UCSCTL6 |= XT2DRIVE1 + XT2DRIVE0;
 
-	TA0CTL |= TASSEL0 + MC1 + TAIE + TAIFG;//ACLK
+	/*TA0CTL |= TASSEL0 + MC1 + TAIE + TAIFG;//ACLK*/
 	P4DIR |= BIT7 + BIT3;
 	P4OUT = 0;
-	while(1)
-	{
-	    __bis_SR_register(LPM1_bits + GIE);
-	}
+
+    TA0CCR0 = 34000;//ticks to 1ms
+
+	 UartInit();
+	 UartAddCallback(uartCallback);
+
+    TA0CTL |= TASSEL0 + MC0 + ID1 + ID0 + TAIE + TAIFG;
+   while(1)
+   {
+
+       __bis_SR_register(LPM2_bits + GIE);
+
+   }
+
 	return 0;
 }
 
+void __attribute__ ((interrupt(TIMER1_A1_VECTOR))) Timer1Tick1_Isr(void){
 
-void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) TAIFTick(void)
-{
-    if (TA0IV & TA0IV_TAIFG)
+ }//not needed
+
+//1ms interrupt
+void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) Timer1Tick0_Isr(void){
+
+    if (TA0IV & TA0IV_TA0IFG)
     {
-        if (P4IN & BIT7)
-        {
-            P4OUT &= ~(BIT7 + BIT3);
-        }
-        else
-        {
-            P4OUT |= BIT7 + BIT3;
-        }
+        toggle();
     }
+ }
 
-}
