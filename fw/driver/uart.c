@@ -28,23 +28,20 @@ void UartInit(void){
 
 	uartcallback = 0;
 
-	P1DIR |=   BIT6;//TXD
-	P1OUT &= ~(BIT6);
 
-	P1SEL |=  BIT5 + BIT6;//special functions
+    P1SEL |= BIT1 + BIT2 ; // P1.1 = RXD, P1.2=TXD
+    P1SEL2 |= BIT1 + BIT2 ; // P1.1 = RXD, P1.2=TXD
 
-	UCA0CTL1 = UCSWRST;
-	UCA0BR0 = 13;//baudrate 2400
+	 /*Baud rate 38400*/
+	    UCA0CTL0 = 0x00;
+	    UCA0CTL1 = UCSSEL1|UCSWRST;
+	    /*See table 15-4*/
+	    UCA0BR0 = (416-256);
+	    UCA0BR1 = 416/256;
+	    UCA0MCTL = UCBRS2|UCBRS1;
+	    UCA0CTL1 &= ~UCSWRST;
 
-	UCA0CTL1 |= UCSSEL0;//ACLK
-
-	//port mapping
-	PMAPCTL |= PMAPRECFG;
-	PMAPKEYID  = 0x2D52;
-	P4SEL = BIT4 + BIT5;
-	PMAPKEYID  = 0x2D52;
-	UCA0CTL1 &= ~UCSWRST;
-	UCA0IE |= UCRXIE;//RX interrupt enable
+	    IE2 |= UCA0TXIE + UCA0RXIE;
 }
 
 void UartAddCallback(void (*f)(uint8_t)){
@@ -57,23 +54,25 @@ void UartReleaseCallback(void){
 
 void UartSendByte(uint8_t data){
 	UCA0TXBUF = data;
-	UCA0IE |= UCTXIE;//Tx enterrupt enabled
 }
 
-void __attribute__ ((interrupt(USCI_A0_VECTOR))) USCI_A0_TX_ISR (void){
-	switch (UCA0IFG&(UCRXIFG+UCTXIFG)){
-	case UCRXIFG:
-		UCA0IFG &= ~(UCRXIFG);
-			if (uartcallback){
-				(*uartcallback)(UCA0RXBUF);
-			}
-		break;
-	case UCTXIFG:
-		UCA0IFG &= ~(UCTXIFG);
-		UCA0IE &= ~(UCTXIE);//Tx enterrupt enabled
-		break;
-	default:
-		UCA0IFG &= ~(UCRXIFG+UCTXIFG);
-		break;
-	}
+
+
+void __attribute__ ((interrupt(USCIAB0TX_VECTOR))) TxEnd(void)
+{
+    if (IFG2&UCA0TXIFG)
+    {
+        IFG2 &= ~UCA0TXIFG;
+    }
+}
+
+void __attribute__ ((interrupt(USCIAB0RX_VECTOR))) RxGet(void)
+{
+    if (IFG2&UCA0RXIFG)
+    {
+        uint8_t symbol = UCA0RXBUF;
+          if (uartcallback)
+              uartcallback(symbol);
+    }
+
 }
