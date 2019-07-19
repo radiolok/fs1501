@@ -10,9 +10,39 @@ void uartCallback(uint8_t cmd){
     UartSendByte(cmd);
 }
 
+
+uint8_t readStatus = 0;
+
+
+inline void sendStart()
+{
+    P1DIR |= BIT0;
+    P1OUT |= BIT0;
+    _delay_cycles(TIMER_NORMAL_TICK>>2);
+    P1OUT &= ~BIT0;
+}
+
+
+inline void sendStop()
+{
+    P1DIR |= BIT4;
+    P1OUT |= BIT4;
+    _delay_cycles(TIMER_NORMAL_TICK);
+    P1OUT &= ~BIT4;
+}
+
+uint8_t symbol = 0x20;
 void toggle(void)
 {
-      if (P1IN & BIT0)
+    if (readStatus)
+    {
+        UartSendByte(symbol++);
+        if (symbol > 0x7f)
+        {
+            symbol = 0x20;
+        }
+    }
+    if (P1IN & BIT0)
     {
         P1OUT &= ~(BIT0);
     }
@@ -47,12 +77,14 @@ void main(void)
 
 
     P1DIR |= BIT0;
+    P1OUT |= BIT3;
+    P1REN |= BIT3;
 
-        UartInit();
+    UartInit();
 
-        UartAddCallback(uartCallback);
+    UartAddCallback(uartCallback);
 
-        TimerStart();
+    TimerStart();
 
 
     while(1)
@@ -65,6 +97,18 @@ void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) TAIFTick(void)
 {
     if (TA0IV & TA0IV_TAIFG)
     {
+        if (readStatus != (P1IN & BIT3))
+        {
+            readStatus = (P1IN & BIT3)? 0 : 1;
+            if (readStatus)
+            {
+                sendStart();
+            }
+            else
+            {
+                sendStop();
+            }
+        }
         toggle();
         //TA0R = TIMER_NORMAL_TICK;
     }
