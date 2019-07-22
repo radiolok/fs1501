@@ -31,6 +31,7 @@ inline void sendStop()
     P1OUT &= ~BIT4;
 }
 
+/*
 uint8_t symbol = 0x20;
 void toggle(void)
 {
@@ -42,17 +43,10 @@ void toggle(void)
             symbol = 0x20;
         }
     }
-    if (P1IN & BIT0)
-    {
-        P1OUT &= ~(BIT0);
-    }
-    else
-    {
-        P1OUT |= BIT0 ;
-    }
+
 
 }
-
+*/
 
 void TimerStart()
 {
@@ -78,7 +72,13 @@ void main(void)
 
     P1DIR |= BIT0;
     P1OUT |= BIT3;
-    P1REN |= BIT3;
+    P1REN |= BIT3 + BIT6 + BIT7;
+
+    P2REN |= BIT0 + BIT1 + BIT2 + BIT3 + BIT4 + BIT5;
+
+    P2OUT &= ~(0x3F);
+
+    P1IE |= BIT7;
 
     UartInit();
 
@@ -93,13 +93,26 @@ void main(void)
     }
 }
 
+
+void __attribute__ ((interrupt(PORT1_VECTOR))) GetData(void)
+{
+    if (P1IFG & BIT7)
+    {
+        //read data
+        uint8_t data = P2IN & 0x3f;
+        data |= P1IN & BIT6;
+        UartSendByte(data);
+    }
+
+}
+
 void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) TAIFTick(void)
 {
     if (TA0IV & TA0IV_TAIFG)
     {
         if (readStatus != (P1IN & BIT3))
         {
-            readStatus = (P1IN & BIT3)? 0 : 1;
+            readStatus = (P1IN & BIT3);
             if (readStatus)
             {
                 sendStart();
@@ -109,7 +122,6 @@ void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) TAIFTick(void)
                 sendStop();
             }
         }
-        toggle();
         //TA0R = TIMER_NORMAL_TICK;
     }
 }
