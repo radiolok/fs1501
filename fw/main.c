@@ -72,13 +72,15 @@ void main(void)
 
     P1DIR |= BIT0;
     P1OUT |= BIT3;
-    P1REN |= BIT3 + BIT6 + BIT7;
+    P1REN |= BIT3 + BIT6 + BIT7 + BIT5;
 
     P2REN |= BIT0 + BIT1 + BIT2 + BIT3 + BIT4 + BIT5;
 
-    P2OUT &= ~(0x3F);
+    P2OUT |= (0x3F);
+    P1OUT |= BIT4 + BIT6 + BIT7 + BIT5;
 
-    P1IE |= BIT7;
+    P1IE |= BIT5;
+    P1IES |= BIT5;//high to low
 
     UartInit();
 
@@ -92,15 +94,17 @@ void main(void)
         __bis_SR_register(LPM1_bits + GIE);
     }
 }
-
+volatile uint32_t bytes_sec = 0;
 
 void __attribute__ ((interrupt(PORT1_VECTOR))) GetData(void)
 {
-    if (P1IFG & BIT7)
+    if (P1IFG & BIT5)
     {
-        //read data
-        uint8_t data = P2IN & 0x3f;
-        data |= P1IN & BIT6;
+        //bytes_sec++;
+        P1IFG = 0x00;
+        //read data from PORT2 and invert it:
+        uint8_t data = (~P2IN) & 0x3f;
+        data |= (~P1IN) & (BIT6 + BIT7);
         UartSendByte(data);
     }
 
@@ -109,7 +113,12 @@ void __attribute__ ((interrupt(PORT1_VECTOR))) GetData(void)
 void __attribute__ ((interrupt(TIMER0_A1_VECTOR))) TAIFTick(void)
 {
     if (TA0IV & TA0IV_TAIFG)
-    {
+    {/*
+        if (bytes_sec)
+            {
+                UartSendByte(((uint8_t)bytes_sec & 0xff));
+                bytes_sec = 0;
+            }*/
         if (readStatus != (P1IN & BIT3))
         {
             readStatus = (P1IN & BIT3);
